@@ -25,7 +25,7 @@ def load_dataset(
     dataset_root_path: str = "datasets/",
     dataset_path: Optional[str] = None,
 ):
-    LOGGER.info(f"Dataset name: {dataset_name}, context length: {context_length}, prediction length {forecast_length}")
+    LOGGER.debug(f"Dataset name: {dataset_name}, context length: {context_length}, prediction length {forecast_length}")
 
     config_path = resources.files("tsfm_public.resources.data_config")
     configs = glob.glob(os.path.join(config_path, "*.yaml"))
@@ -57,16 +57,30 @@ def load_dataset(
         prediction_length=forecast_length,
     )
 
+    LOGGER.debug("Timestamp column: %s", tsp.timestamp_column)
+    LOGGER.debug("Target columns: %s", tsp.target_columns)
+    LOGGER.debug("Observable columns: %s", tsp.observable_columns)
+    LOGGER.debug("Control columns: %s", tsp.control_columns)
+    LOGGER.debug("Conditional columns: %s", tsp.conditional_columns)
+    LOGGER.debug("Static Categorical columns: %s", tsp.static_categorical_columns)
+
     split_config = config["split"]
 
     # if dataset_path is provided we will ignore the config file
     if dataset_path is None:
         dataset_path = Path(dataset_root_path) / config["data_path"] / config["data_file"]
+    else:
+        LOGGER.debug(f"Custom dataset path: {dataset_path}")
 
     data = pd.read_csv(
         dataset_path,
         parse_dates=[config["timestamp_column"]],
     )
+
+    print(len(data))
+
+    if len(data) <= 512 + 96:
+        raise IndexError('Data is shorter than the required horizon.')
 
     train_dataset, valid_dataset, test_dataset = get_datasets(
         tsp,
@@ -75,6 +89,6 @@ def load_dataset(
         fewshot_fraction=fewshot_fraction,
         fewshot_location=fewshot_location,
     )
-    LOGGER.info(f"Data lengths: train = {len(train_dataset)}, val = {len(valid_dataset)}, test = {len(test_dataset)}")
+    LOGGER.debug(f"Data lengths: train = {len(train_dataset)}, val = {len(valid_dataset)}, test = {len(test_dataset)}")
 
-    return train_dataset, valid_dataset, test_dataset
+    return train_dataset, valid_dataset, test_dataset, tsp, config

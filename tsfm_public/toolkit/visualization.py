@@ -366,7 +366,7 @@ def plot_predictions(
             y_hat = predictions_subset[i]
 
             ts_y = np.arange(plot_context + prediction_length)
-            y = batch["future_values"][:, channel].squeeze().numpy()
+            y = batch["future_values"][:prediction_length, channel].squeeze().numpy()
             x = batch["past_values"][-plot_context:, channel].squeeze().numpy()
             y = np.concatenate((x, y), axis=0)
             border = plot_context
