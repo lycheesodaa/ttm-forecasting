@@ -33,8 +33,6 @@ DATA_ROOT_PATH = "datasets/"
 
 # target_dataset = "etth1"
 target_dataset = "demand_sg"
-# target_dataset = f"stocks_{news_type}"
-# target_dataset = f"stocks_{news_type}_emotion"
 
 # csv output dir
 output_dir = f'results/{target_dataset}/'
@@ -52,7 +50,7 @@ DATASET_FREQ = '1h'
 TTM_MODEL_REVISION = "main"
 
 # global param setting
-BSZ = 16
+BSZ = 32
 
 def zeroshot_eval(dataset_name, batch_size, context_length=512, forecast_length=96, prediction_filter_length=None):
     # Get data
@@ -112,10 +110,10 @@ def zeroshot_eval(dataset_name, batch_size, context_length=512, forecast_length=
         end_timestamp = pd.Timestamp(item['timestamp'])
         future_dates = pd.date_range(
             start=end_timestamp,
-            periods=prediction_filter_length,
+            periods=prediction_filter_length + 1,
             freq=DATASET_FREQ
         )
-        timestamps.extend(future_dates)
+        timestamps.extend(future_dates[1:])
         true.extend(item['future_values'][:prediction_filter_length, 0].flatten().tolist())
 
     # Create DataFrame with predictions and dates
@@ -324,9 +322,9 @@ for pl in pred_lens:
         prediction_filter_length=pl
     )
 
-    # finetune_eval(
-    #     dataset_name=target_dataset,
-    #     batch_size=BSZ,
-    #     prediction_filter_length=pl,
-    #     fewshot_percent=100
-    # )
+    finetune_eval(
+        dataset_name=target_dataset,
+        batch_size=BSZ,
+        prediction_filter_length=pl,
+        fewshot_percent=100
+    )

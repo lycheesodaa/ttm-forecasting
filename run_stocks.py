@@ -128,10 +128,10 @@ def zeroshot_eval(dataset_name, batch_size, context_length=512, forecast_length=
             end_timestamp = pd.Timestamp(item['timestamp'])
             future_dates = pd.date_range(
                 start=end_timestamp,
-                periods=prediction_filter_length,
+                periods=prediction_filter_length + 1,
                 freq=DATASET_FREQ
             )
-            timestamps.extend(future_dates)
+            timestamps.extend(future_dates[1:])
             true.extend(item['future_values'][:prediction_filter_length, 0].flatten().tolist())
 
         # create DataFrame with predictions and dates
