@@ -25,7 +25,7 @@ def load_dataset(
     dataset_root_path: str = "datasets/",
     dataset_path: Optional[str] = None,
 ):
-    LOGGER.debug(f"Dataset name: {dataset_name}, context length: {context_length}, prediction length {forecast_length}")
+    LOGGER.info(f"Dataset name: {dataset_name}, context length: {context_length}, prediction length {forecast_length}")
 
     config_path = resources.files("tsfm_public.resources.data_config")
     configs = glob.glob(os.path.join(config_path, "*.yaml"))
@@ -57,12 +57,12 @@ def load_dataset(
         prediction_length=forecast_length,
     )
 
-    LOGGER.debug("Timestamp column: %s", tsp.timestamp_column)
-    LOGGER.debug("Target columns: %s", tsp.target_columns)
-    LOGGER.debug("Observable columns: %s", tsp.observable_columns)
-    LOGGER.debug("Control columns: %s", tsp.control_columns)
-    LOGGER.debug("Conditional columns: %s", tsp.conditional_columns)
-    LOGGER.debug("Static Categorical columns: %s", tsp.static_categorical_columns)
+    LOGGER.info("Timestamp column: %s", tsp.timestamp_column)
+    LOGGER.info("Target columns: %s", tsp.target_columns)
+    LOGGER.info("Observable columns: %s", tsp.observable_columns)
+    LOGGER.info("Control columns: %s", tsp.control_columns)
+    LOGGER.info("Conditional columns: %s", tsp.conditional_columns)
+    LOGGER.info("Static Categorical columns: %s", tsp.static_categorical_columns)
 
     split_config = config["split"]
 
@@ -70,7 +70,7 @@ def load_dataset(
     if dataset_path is None:
         dataset_path = Path(dataset_root_path) / config["data_path"] / config["data_file"]
     else:
-        LOGGER.debug(f"Custom dataset path: {dataset_path}")
+        LOGGER.info(f"Custom dataset path: {dataset_path}")
 
     data = pd.read_csv(
         dataset_path,
@@ -89,6 +89,6 @@ def load_dataset(
         fewshot_fraction=fewshot_fraction,
         fewshot_location=fewshot_location,
     )
-    LOGGER.debug(f"Data lengths: train = {len(train_dataset)}, val = {len(valid_dataset)}, test = {len(test_dataset)}")
+    LOGGER.info(f"Data lengths: train = {len(train_dataset)}, val = {len(valid_dataset)}, test = {len(test_dataset)}")
 
     return train_dataset, valid_dataset, test_dataset, tsp, config

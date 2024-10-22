@@ -1,0 +1,30 @@
+data_file: MS.csv
+data_path: stocks/candle_w_emotion/day_average_headlines/
+id_columns: []
+timestamp_column: date
+#target_columns: []
+target_columns: [close]
+observable_columns: []
+control_columns: []
+conditional_columns: []
+static_categorical_columns: []
+freq: B
+
+scale: 
+    scaling: True
+    scaler_type: standard
+
+encode_categorical: False
+
+split:
+    train:
+        - 0
+        - 0.7
+    valid:
+        - 0.7
+        - 0.85
+    test:
+        - 0.85
+        - 1.0
+
+

@@ -8,12 +8,14 @@ import argparse
 parser = argparse.ArgumentParser(description='TTMs_stocks')
 parser.add_argument('--filepath', type=str)
 parser.add_argument('--news_type', type=str, default='headlines',
-                    choices=['headlines', 'content', 'headlines_emotion', 'content_emotion'])
+                    choices=['headlines_sentiment', 'content_sentiment',
+                             'headlines_emotion', 'content_emotion',
+                             'headlines_historical', 'content_historical'])
 parser.add_argument('--batch_size', type=int, default=16)
 parser.add_argument('--gpu_id', type=int, default=1)
 args = parser.parse_args()
 
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+os.environ["CUDA_VISIBLE_DEVICES"]=f'{args.gpu_id}'
 import yaml
 import glob
 import logging
@@ -43,7 +45,7 @@ DATA_REL_PATH = "stocks/candle_w_emotion/day_average_content/"
 target_dataset = f"stocks_{args.news_type}"
 
 # csv output dir
-output_dir = f'results/{target_dataset}/'
+output_dir = f'results/stocks_fyp/{target_dataset}/'
 if not os.path.exists(output_dir):
     os.mkdir(output_dir)
 
@@ -75,6 +77,7 @@ def zeroshot_eval(dataset_name, batch_size, context_length=512, forecast_length=
                 dataset_path=Path(filepath) / file,
             )
         except IndexError as e:
+            # a lot fewer predictions, since the context and forecast lengths are fixed
             print(e, f'Skipping {file}')
             continue
 
@@ -309,10 +312,10 @@ def finetune_eval(
         end_timestamp = pd.Timestamp(item['timestamp'])
         future_dates = pd.date_range(
             start=end_timestamp,
-            periods=prediction_filter_length,
+            periods=prediction_filter_length + 1,
             freq=DATASET_FREQ
         )
-        timestamps.extend(future_dates)
+        timestamps.extend(future_dates[1:])
         true.extend(item['future_values'][:prediction_filter_length, 0].flatten().tolist())
 
     # Create DataFrame with predictions and dates
@@ -339,6 +342,7 @@ def finetune_eval(
     # )
 
 pred_lens = [1, 3, 7, 14] # stocks
+# pred_lens = [1] # stocks
 for pl in pred_lens:
     zeroshot_eval(
         dataset_name=target_dataset,

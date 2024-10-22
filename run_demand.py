@@ -1,9 +1,8 @@
 import math
 import os
 
+# os.environ["CUDA_VISIBLE_DEVICES"]="1"
 import torch
-
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
 import yaml
 import glob
 import logging
@@ -32,7 +31,8 @@ DATA_ROOT_PATH = "datasets/"
 # news_type = 'headlines'
 
 # target_dataset = "etth1"
-target_dataset = "demand_sg"
+# target_dataset = "demand_sg"
+target_dataset = "demand_aus"
 
 # csv output dir
 output_dir = f'results/{target_dataset}/'
@@ -50,7 +50,7 @@ DATASET_FREQ = '1h'
 TTM_MODEL_REVISION = "main"
 
 # global param setting
-BSZ = 32
+BSZ = 8
 
 def zeroshot_eval(dataset_name, batch_size, context_length=512, forecast_length=96, prediction_filter_length=None):
     # Get data
@@ -123,7 +123,7 @@ def zeroshot_eval(dataset_name, batch_size, context_length=512, forecast_length=
         col_list[0]: reshaped
     })
     to_export[col_list[0]] = tsp.inverse_scale_targets(to_export[[col_list[0]]])
-    to_export['true'] = tsp.inverse_scale_targets(to_export[['true']].rename(columns={'true':'close'}))
+    to_export['true'] = tsp.inverse_scale_targets(to_export[['true']].rename(columns={'true':'actual'}))
 
     # dset_test should be the same size as reshaped
     to_export.to_csv(output_dir + f'TTMs_pl{prediction_filter_length}_zeroshot.csv')
@@ -247,7 +247,7 @@ def finetune_eval(
         optimizer,
         learning_rate,
         epochs=num_epochs,
-        steps_per_epoch=math.ceil(len(dset_train) / (batch_size)),
+        steps_per_epoch=math.ceil(len(dset_train) / batch_size),
     )
 
     finetune_forecast_trainer = Trainer(
@@ -285,10 +285,10 @@ def finetune_eval(
         end_timestamp = pd.Timestamp(item['timestamp'])
         future_dates = pd.date_range(
             start=end_timestamp,
-            periods=prediction_filter_length,
+            periods=prediction_filter_length + 1,
             freq=DATASET_FREQ
         )
-        timestamps.extend(future_dates)
+        timestamps.extend(future_dates[1:])
         true.extend(item['future_values'][:prediction_filter_length, 0].flatten().tolist())
 
     # Create DataFrame with predictions and dates
@@ -298,12 +298,12 @@ def finetune_eval(
         col_list[0]: reshaped
     })
     to_export[col_list[0]] = tsp.inverse_scale_targets(to_export[[col_list[0]]])
-    to_export['true'] = tsp.inverse_scale_targets(to_export[['true']].rename(columns={'true':'close'}))
+    to_export['true'] = tsp.inverse_scale_targets(to_export[['true']].rename(columns={'true':'actual'}))
 
     if fewshot_percent == 100:
-        to_export.to_csv(f'results/TTMs_pl{prediction_filter_length}_predictions_fullshot.csv')
+        to_export.to_csv(output_dir + f'TTMs_pl{prediction_filter_length}_fullshot.csv')
     else:
-        to_export.to_csv(f'results/TTMs_pl{prediction_filter_length}_predictions_fewshot{fewshot_percent}.csv')
+        to_export.to_csv(output_dir + f'TTMs_pl{prediction_filter_length}_fewshot{fewshot_percent}.csv')
 
     # plot
     # plot_predictions(
@@ -327,4 +327,11 @@ for pl in pred_lens:
         batch_size=BSZ,
         prediction_filter_length=pl,
         fewshot_percent=100
+    )
+
+    finetune_eval(
+        dataset_name=target_dataset,
+        batch_size=BSZ,
+        prediction_filter_length=pl,
+        fewshot_percent=5
     )
