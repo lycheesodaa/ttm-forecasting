@@ -24,6 +24,8 @@ def load_dataset(
     fewshot_location="first",
     dataset_root_path: str = "datasets/",
     dataset_path: Optional[str] = None,
+    conditional_columns=None,
+    use_padding=False,
 ):
     LOGGER.info(f"Dataset name: {dataset_name}, context length: {context_length}, prediction length {forecast_length}")
 
@@ -57,6 +59,10 @@ def load_dataset(
         prediction_length=forecast_length,
     )
 
+    # use a manually specified set of conditional columns for the carbon dataset
+    if dataset_name == 'carbon':
+        tsp.conditional_columns = conditional_columns
+
     LOGGER.info("Timestamp column: %s", tsp.timestamp_column)
     LOGGER.info("Target columns: %s", tsp.target_columns)
     LOGGER.info("Observable columns: %s", tsp.observable_columns)
@@ -77,10 +83,8 @@ def load_dataset(
         parse_dates=[config["timestamp_column"]],
     )
 
-    print(len(data))
-
-    if len(data) <= 512 + 96:
-        raise IndexError('Data is shorter than the required horizon.')
+    # if len(data) <= 512 + 96:
+    #     raise IndexError('Data is shorter than the required horizon.')
 
     train_dataset, valid_dataset, test_dataset = get_datasets(
         tsp,
@@ -88,7 +92,9 @@ def load_dataset(
         split_config=split_config,
         fewshot_fraction=fewshot_fraction,
         fewshot_location=fewshot_location,
+        use_padding=use_padding
     )
+
     LOGGER.info(f"Data lengths: train = {len(train_dataset)}, val = {len(valid_dataset)}, test = {len(test_dataset)}")
 
     return train_dataset, valid_dataset, test_dataset, tsp, config

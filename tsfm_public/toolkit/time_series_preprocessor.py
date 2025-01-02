@@ -790,6 +790,7 @@ def get_datasets(
     fewshot_location: str = FractionLocation.LAST.value,
     as_univariate: bool = False,
     use_frequency_token: bool = False,
+    use_padding: bool = False,
 ) -> Tuple[Any]:
     """Creates the preprocessed pytorch datasets needed for training and evaluation
     using the HuggingFace trainer
@@ -900,6 +901,11 @@ def get_datasets(
 
         params["target_columns"] = ["value"]
         params["id_columns"] = params["id_columns"] + ["column_id"]
+
+    # New code - padding-related for shorter than TTM requirements
+    if use_padding:
+        params["pad_past_length"] = 512
+        params["pad_future_length"] = 96
 
     return tuple([ForecastDFDataset(d, **params) for d in train_valid_test_prep])
 

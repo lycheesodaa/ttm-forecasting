@@ -13,6 +13,49 @@ import torch
 from .util import join_list_without_repeat
 
 
+def pad_sequence_to_length(sequence: torch.Tensor, target_length: int, pad_value: float = 0.0,
+                           left_pad: bool = True) -> torch.Tensor:
+    """
+    Pads a sequence tensor to a target length, with option for left or right padding.
+
+    Args:
+        sequence: Input tensor of shape (seq_len, features)
+        target_length: Desired length of the sequence
+        pad_value: Value to use for padding
+        left_pad: If True, add padding at the beginning of sequence; if False, add at the end
+
+    Returns:
+        Padded tensor of shape (target_length, features)
+    """
+    current_length = sequence.shape[0]
+
+    if current_length > target_length:
+        # If sequence is longer, truncate it from the left to keep the most recent values
+        return sequence[-target_length:]
+
+    if current_length < target_length:
+        # If sequence is shorter, pad it
+        padding_length = target_length - current_length
+
+        # Create padding tensor
+        if len(sequence.shape) == 2:
+            # For 2D tensors (sequence, features)
+            num_features = sequence.shape[1]
+            padding = torch.full((padding_length, num_features), pad_value, dtype=sequence.dtype)
+        else:
+            # For 1D tensors
+            padding = torch.full((padding_length,), pad_value, dtype=sequence.dtype)
+
+        # Concatenate the padding with the original sequence
+        if left_pad:
+            return torch.cat([padding, sequence], dim=0)
+        else:
+            return torch.cat([sequence, padding], dim=0)
+
+    # If lengths match, return original sequence
+    return sequence
+
+
 class BaseDFDataset(torch.utils.data.Dataset):
     """Base dataset for time series models built upon a pandas dataframe
 
@@ -415,6 +458,8 @@ class ForecastDFDataset(BaseConcatDFDataset):
         autoregressive_modeling: bool = True,
         stride: int = 1,
         fill_value: Union[float, int] = 0.0,
+        pad_past_length: Optional[int] = None,  # New parameter
+        pad_future_length: Optional[int] = None,  # New parameter
     ):
         # output_columns_tmp = input_columns if output_columns == [] else output_columns
 
@@ -436,10 +481,13 @@ class ForecastDFDataset(BaseConcatDFDataset):
             static_categorical_columns=static_categorical_columns,
             frequency_token=frequency_token,
             autoregressive_modeling=autoregressive_modeling,
+            pad_past_length=pad_past_length,  # Pass through to BaseForecastDFDataset
+            pad_future_length=pad_future_length,  # Pass through to BaseForecastDFDataset
         )
         self.n_inp = 2
         # for forecasting, the number of targets is the same as number of X variables
         self.n_targets = self.n_vars
+
 
     class BaseForecastDFDataset(BaseDFDataset):
         """
@@ -464,6 +512,8 @@ class ForecastDFDataset(BaseConcatDFDataset):
             autoregressive_modeling: bool = True,
             stride: int = 1,
             fill_value: Union[float, int] = 0.0,
+            pad_past_length: Optional[int] = None,  # New parameter
+            pad_future_length: Optional[int] = None,  # New parameter
         ):
             self.frequency_token = frequency_token
             self.target_columns = target_columns
@@ -472,6 +522,8 @@ class ForecastDFDataset(BaseConcatDFDataset):
             self.conditional_columns = conditional_columns
             self.static_categorical_columns = static_categorical_columns
             self.autoregressive_modeling = autoregressive_modeling
+            self.pad_past_length = pad_past_length
+            self.pad_future_length = pad_future_length
 
             x_cols = join_list_without_repeat(
                 target_columns,
@@ -523,11 +575,27 @@ class ForecastDFDataset(BaseConcatDFDataset):
 
             seq_y[:, self.y_mask_conditional] = 0
 
+            # New code - applying padding to data that is shorter than TTM requirements
+            # Convert to torch tensors first
+            past_values = np_to_torch(np.nan_to_num(seq_x, nan=self.fill_value))
+            future_values = np_to_torch(np.nan_to_num(seq_y, nan=self.fill_value))
+            past_observed_mask = np_to_torch(~np.isnan(seq_x))
+            future_observed_mask = np_to_torch(~np.isnan(seq_y))
+
+            # Apply padding if specified
+            if self.pad_past_length is not None:
+                past_values = pad_sequence_to_length(past_values, self.pad_past_length, self.fill_value)
+                past_observed_mask = pad_sequence_to_length(past_observed_mask, self.pad_past_length, False)
+
+            if self.pad_future_length is not None:
+                future_values = pad_sequence_to_length(future_values, self.pad_future_length, self.fill_value, left_pad=False)
+                future_observed_mask = pad_sequence_to_length(future_observed_mask, self.pad_future_length, False, left_pad=False)
+
             ret = {
-                "past_values": np_to_torch(np.nan_to_num(seq_x, nan=self.fill_value)),
-                "future_values": np_to_torch(np.nan_to_num(seq_y, nan=self.fill_value)),
-                "past_observed_mask": np_to_torch(~np.isnan(seq_x)),
-                "future_observed_mask": np_to_torch(~np.isnan(seq_y)),
+                "past_values": past_values,
+                "future_values": future_values,
+                "past_observed_mask": past_observed_mask,
+                "future_observed_mask": future_observed_mask,
             }
 
             if self.datetime_col:
