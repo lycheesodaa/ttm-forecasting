@@ -1,7 +1,7 @@
 import math
 import os
 
-# os.environ["CUDA_VISIBLE_DEVICES"]="1"
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 import torch
 import yaml
 import glob
@@ -32,7 +32,13 @@ DATA_ROOT_PATH = "datasets/"
 
 # target_dataset = "etth1"
 # target_dataset = "demand_sg"
-target_dataset = "demand_aus"
+target_dataset = "demand_sg_top30"
+# target_dataset = "demand_sg_top9"
+# target_dataset = "demand_sg_top5"
+# target_dataset = "demand_sg_top0"
+# target_dataset = "demand_sg_daily"
+# target_dataset = "demand_aus"
+# target_dataset = "demand_aus_daily"
 
 # csv output dir
 output_dir = f'results/{target_dataset}/'
@@ -43,6 +49,7 @@ if not os.path.exists(output_dir):
 OUT_DIR = "ttm_finetuned_models/"
 
 DATASET_FREQ = '1h'
+# DATASET_FREQ = 'D'
 
 # TTM model branch
 # Use main for 512-96 model
@@ -50,7 +57,8 @@ DATASET_FREQ = '1h'
 TTM_MODEL_REVISION = "main"
 
 # global param setting
-BSZ = 8
+BSZ = 4
+grad_acc = 4
 
 def zeroshot_eval(dataset_name, batch_size, context_length=512, forecast_length=96, prediction_filter_length=None):
     # Get data
@@ -141,6 +149,7 @@ def zeroshot_eval(dataset_name, batch_size, context_length=512, forecast_length=
 def finetune_eval(
     dataset_name,
     batch_size,
+    gradient_accumulation_steps=1,
     learning_rate=0.001,
     context_length=512,
     forecast_length=96,
@@ -218,6 +227,7 @@ def finetune_eval(
         overwrite_output_dir=True,
         learning_rate=learning_rate,
         num_train_epochs=num_epochs,
+        gradient_accumulation_steps=gradient_accumulation_steps,
         do_eval=True,
         evaluation_strategy="epoch",
         per_device_train_batch_size=batch_size,
@@ -261,6 +271,8 @@ def finetune_eval(
 
     # Fine tune
     finetune_forecast_trainer.train()
+
+    torch.cuda.empty_cache()
 
     # Evaluation
     if fewshot_percent == 100:
@@ -314,24 +326,36 @@ def finetune_eval(
     #     channel=0,
     # )
 
-pred_lens = [1, 12, 24, 36, 48, 60, 72] # TODO run this for demand
+err_log = []
+pred_lens = [1, 12, 24, 36, 48, 60, 72, 168, 336] # demand hourly
+# pred_lens = [1, 3, 7, 14, 30, 60, 178, 356] # demand daily
 for pl in pred_lens:
-    zeroshot_eval(
-        dataset_name=target_dataset,
-        batch_size=BSZ,
-        prediction_filter_length=pl
-    )
+    try:
+        # zeroshot_eval(
+        #     dataset_name=target_dataset,
+        #     batch_size=BSZ,
+        #     prediction_filter_length=pl
+        # )
 
-    finetune_eval(
-        dataset_name=target_dataset,
-        batch_size=BSZ,
-        prediction_filter_length=pl,
-        fewshot_percent=100
-    )
+        finetune_eval(
+            dataset_name=target_dataset,
+            batch_size=BSZ,
+            gradient_accumulation_steps=grad_acc,
+            prediction_filter_length=pl,
+            fewshot_percent=100
+        )
+    except Exception as e:
+        # likely that 178 and 356 don't work
+        err_log.append(e)
 
-    finetune_eval(
-        dataset_name=target_dataset,
-        batch_size=BSZ,
-        prediction_filter_length=pl,
-        fewshot_percent=5
-    )
+    # finetune_eval(
+    #     dataset_name=target_dataset,
+    #     batch_size=BSZ,
+    #     gradient_accumulation_steps = grad_acc,
+    #     prediction_filter_length=pl,
+    #     fewshot_percent=5
+    # )
+
+    torch.cuda.empty_cache()
+
+print(err_log)

@@ -6,12 +6,13 @@ timestamp_column: datetime
 target_columns: [actual]
 observable_columns: []
 control_columns: []
-conditional_columns: []
-#conditional_columns: [price, humidity, tempC, heatIndexC, precipMM, windspeedKmph, winddirDegree, windGustKmph,
+#conditional_columns: []
+conditional_columns: [hour,period,humidity,tempC,heatIndexC]
+#conditional_columns: [price,hour,period,is_weekend,humidity,tempC,heatIndexC,pressure,aggregatePSI]
+#conditional_columns: [year, month, day, hour, price, humidity, tempC, heatIndexC, precipMM, windspeedKmph, winddirDegree, windGustKmph,
 #                      weatherDesc, visibility, pressure, cloudcover, dewPointC, uvIndex, feelsLikeC,
 #                      north, south, east, west, central, aggregatePSI]
 static_categorical_columns: []
-#static_categorical_columns: [year, month, day, hour]
 freq: 1h
 
 scale: 
