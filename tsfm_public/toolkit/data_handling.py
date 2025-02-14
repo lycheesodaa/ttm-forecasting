@@ -59,8 +59,8 @@ def load_dataset(
         prediction_length=forecast_length,
     )
 
-    # use a manually specified set of conditional columns for the carbon dataset
-    if dataset_name == 'carbon':
+    # use a programmatic set of conditional columns if specified, overrides YAML file
+    if conditional_columns is not None:
         tsp.conditional_columns = conditional_columns
 
     LOGGER.info("Timestamp column: %s", tsp.timestamp_column)

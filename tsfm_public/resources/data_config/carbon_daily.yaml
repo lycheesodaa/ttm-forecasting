@@ -1,0 +1,30 @@
+#data_file: merged_data_nan.csv
+data_file: merged_data_imputed.csv
+data_path: carbon/res_daily/
+id_columns: []
+timestamp_column: Date
+target_columns: [Price]
+observable_columns: []
+control_columns: []
+conditional_columns: []
+static_categorical_columns: []
+freq: B
+
+scale: 
+    scaling: True
+    scaler_type: standard
+
+encode_categorical: False
+
+split:
+    train:
+        - 0
+        - 0.6
+    valid:
+        - 0.6
+        - 0.8
+    test:
+        - 0.8
+        - 1.0
+
+

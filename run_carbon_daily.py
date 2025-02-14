@@ -26,41 +26,20 @@ from tsfm_public.toolkit.visualization import plot_predictions
 SEED = 1234
 set_seed(SEED)
 
-CH_MIX=True
-
 # DATA ROOT PATH
 DATA_ROOT_PATH = "datasets/"
 
-# news_type = 'content'
-# news_type = 'headlines'
-
-# target_dataset = "etth1"
-# target_dataset = "demand_sg"
-# target_dataset = "demand_sg_top9"
-# target_dataset = "demand_sg_top5"
-# target_dataset = "demand_sg_top0"
-# target_dataset = "demand_sg_daily"
-# target_dataset = "demand_sg_daily_top9"
-# target_dataset = "demand_sg_daily_top5"
-# target_dataset = "demand_sg_daily_top0"
-target_dataset = "demand_aus"
-# target_dataset = "demand_aus_top9"
-# target_dataset = "demand_aus_top5"
-# target_dataset = "demand_aus_top0"
-# target_dataset = "demand_aus_daily"
-# target_dataset = "demand_aus_daily_top9"
-# target_dataset = "demand_aus_daily_top5"
-# target_dataset = "demand_aus_daily_top0"
+target_dataset = "carbon_daily"
 
 # csv output dir
-output_dir = f'results/{target_dataset}/ch_mix/'
-Path(output_dir).mkdir(parents=True, exist_ok=True)
+output_dir = f'results/{target_dataset}/'
+if not os.path.exists(output_dir):
+    os.mkdir(output_dir)
 
 # Results dir
 OUT_DIR = "ttm_finetuned_models/"
 
-DATASET_FREQ = '1h'
-# DATASET_FREQ = 'D'
+DATASET_FREQ = 'B'
 
 # TTM model branch
 # Use main for 512-96 model
@@ -68,11 +47,12 @@ DATASET_FREQ = '1h'
 TTM_MODEL_REVISION = "main"
 
 # global param setting
-BSZ = 16
-grad_acc = 1
+BSZ = 4
+grad_acc = 4
 
-def zeroshot_eval(dataset_name, batch_size, context_length=512, forecast_length=96, prediction_filter_length=None):
-    # Get data
+def zeroshot_eval(dataset_name, batch_size, context_length=512, forecast_length=96,
+                  prediction_filter_length=None):
+    # Get data - zeroshot models are channel independent, and thus should not require conditional columns
     _, _, dset_test, tsp, cfg = load_dataset(
         dataset_name=dataset_name,
         context_length=context_length,
@@ -97,7 +77,6 @@ def zeroshot_eval(dataset_name, batch_size, context_length=512, forecast_length=
             )
         else:
             raise ValueError("`prediction_filter_length` should be <= `forecast_length")
-
     temp_dir = tempfile.mkdtemp()
     # zeroshot_trainer
     zeroshot_trainer = Trainer(
@@ -139,12 +118,14 @@ def zeroshot_eval(dataset_name, batch_size, context_length=512, forecast_length=
         col_list[0]: reshaped
     })
     to_export[col_list[0]] = tsp.inverse_scale_targets(to_export[[col_list[0]]])
-    to_export['true'] = tsp.inverse_scale_targets(to_export[['true']].rename(columns={'true':'actual'}))
+    to_export['true'] = tsp.inverse_scale_targets(to_export[['true']].rename(columns={'true':tsp.target_columns[0]}))
 
     # dset_test should be the same size as reshaped
-    to_export.to_csv(output_dir + f'TTMs_pl{prediction_filter_length}_zeroshot.csv')
+    to_export.to_csv(output_dir + f'TTMs_feat0_ctx{context_length}_pl{prediction_filter_length}_zeroshot.csv')
 
-    log_into_csv(to_export, dataset_name, 'zeroshot', bsz=batch_size, pred_filter_len=prediction_filter_length)
+    log_into_csv(to_export, dataset_name, 'zeroshot',
+                 bsz=batch_size, pred_filter_len=prediction_filter_length,
+                 log_file_name='carbon', pred_col_name='Price')
 
     # plot
     # plot_predictions(
@@ -168,6 +149,7 @@ def finetune_eval(
     num_epochs=50,
     save_dir=OUT_DIR,
     prediction_filter_length=None,
+    conditional_columns=None,
 ):
     out_dir = os.path.join(save_dir, dataset_name)
 
@@ -183,46 +165,28 @@ def finetune_eval(
         forecast_length,
         fewshot_fraction=fewshot_percent / 100,
         dataset_root_path=DATA_ROOT_PATH,
+        conditional_columns=conditional_columns,
     )
 
-    if CH_MIX:
-        # Load model
-        if prediction_filter_length is None:
-            finetune_forecast_model = TinyTimeMixerForPrediction.from_pretrained(
-                "ibm-granite/granite-timeseries-ttm-v1",
-                revision=TTM_MODEL_REVISION,
-                num_input_channels=tsp.num_input_channels,
-                decoder_mode="mix_channel",  # ch_mix:  set to mix_channel for mixing channels in history
-                prediction_channel_indices=tsp.prediction_channel_indices,
-            )
-        else:
-            if prediction_filter_length <= forecast_length:
-                finetune_forecast_model = TinyTimeMixerForPrediction.from_pretrained(
-                    "ibm-granite/granite-timeseries-ttm-v1",
-                    revision=TTM_MODEL_REVISION,
-                    prediction_filter_length=prediction_filter_length,
-                    num_input_channels=tsp.num_input_channels,
-                    decoder_mode="mix_channel",  # ch_mix:  set to mix_channel for mixing channels in history
-                    prediction_channel_indices=tsp.prediction_channel_indices,
-                )
-            else:
-                raise ValueError("`prediction_filter_length` should be <= `forecast_length")
+    if prediction_filter_length is None:
+        finetune_forecast_model = TinyTimeMixerForPrediction.from_pretrained(
+            "ibm-granite/granite-timeseries-ttm-v1",
+            revision=TTM_MODEL_REVISION,
+            num_input_channels=tsp.num_input_channels,
+            decoder_mode="mix_channel",  # ch_mix:  set to mix_channel for mixing channels in history
+            prediction_channel_indices=tsp.prediction_channel_indices,
+        )
+    elif prediction_filter_length <= forecast_length:
+        finetune_forecast_model = TinyTimeMixerForPrediction.from_pretrained(
+            "ibm-granite/granite-timeseries-ttm-v1",
+            revision=TTM_MODEL_REVISION,
+            prediction_filter_length=prediction_filter_length,
+            num_input_channels=tsp.num_input_channels,
+            decoder_mode="mix_channel",  # ch_mix:  set to mix_channel for mixing channels in history
+            prediction_channel_indices=tsp.prediction_channel_indices,
+        )
     else:
-        # Load model
-        if prediction_filter_length is None:
-            finetune_forecast_model = TinyTimeMixerForPrediction.from_pretrained(
-                "ibm-granite/granite-timeseries-ttm-v1",
-                revision=TTM_MODEL_REVISION,
-            )
-        else:
-            if prediction_filter_length <= forecast_length:
-                finetune_forecast_model = TinyTimeMixerForPrediction.from_pretrained(
-                    "ibm-granite/granite-timeseries-ttm-v1",
-                    revision=TTM_MODEL_REVISION,
-                    prediction_filter_length=prediction_filter_length,
-                )
-            else:
-                raise ValueError("`prediction_filter_length` should be <= `forecast_length")
+        raise ValueError("`prediction_filter_length` should be <= `forecast_length")
 
     if freeze_backbone:
         print(
@@ -250,8 +214,8 @@ def finetune_eval(
         do_eval=True,
         evaluation_strategy="epoch",
         per_device_train_batch_size=batch_size,
-        per_device_eval_batch_size=1,
-        dataloader_num_workers=1,
+        per_device_eval_batch_size=batch_size,
+        dataloader_num_workers=8,
         report_to=None,
         save_strategy="epoch",
         logging_strategy="epoch",
@@ -329,16 +293,18 @@ def finetune_eval(
         col_list[0]: reshaped
     })
     to_export[col_list[0]] = tsp.inverse_scale_targets(to_export[[col_list[0]]])
-    to_export['true'] = tsp.inverse_scale_targets(to_export[['true']].rename(columns={'true':'actual'}))
+    to_export['true'] = tsp.inverse_scale_targets(to_export[['true']].rename(columns={'true':col_list[0]}))
 
     if fewshot_percent == 100:
-        to_export.to_csv(output_dir + f'TTMs_pl{prediction_filter_length}_fullshot.csv')
+        to_export.to_csv(output_dir + f'TTMs_feat{len(conditional_columns)}_ctx{context_length}_pl{prediction_filter_length}_fullshot.csv')
     else:
-        to_export.to_csv(output_dir + f'TTMs_pl{prediction_filter_length}_fewshot{fewshot_percent}.csv')
+        to_export.to_csv(output_dir + f'TTMs_feat{len(conditional_columns)}_ctx{context_length}_pl{prediction_filter_length}_fewshot{fewshot_percent}.csv')
 
     log_into_csv(to_export, dataset_name, 'fullshot',
                  ch_mix=True, seq_len=context_length, pred_len=forecast_length,
-                 pred_filter_len=prediction_filter_length, lr=learning_rate, bsz=batch_size)
+                 pred_filter_len=prediction_filter_length, lr=learning_rate, bsz=batch_size,
+                 log_file_name = 'carbon', pred_col_name='Price')
+
     # plot
     # plot_predictions(
     #     model=finetune_forecast_trainer.model,
@@ -349,35 +315,41 @@ def finetune_eval(
     # )
 
 err_log = []
-pred_lens = [24, 48, 72] # demand hourly
-# pred_lens = [1, 7, 14, 30, 60, 178, 356] # demand daily
-for pl in pred_lens:
-    try:
-        # zeroshot_eval(
-        #     dataset_name=target_dataset,
-        #     batch_size=BSZ * grad_acc,
-        #     prediction_filter_length=pl
-        # )
+pred_lens = [1, 2, 3, 4, 5, 7, 14, 21, 28, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90]
+feat_pct = [0, 0.3, 0.8]
 
-        finetune_eval(
-            dataset_name=target_dataset,
-            batch_size=BSZ,
-            gradient_accumulation_steps=grad_acc,
-            prediction_filter_length=pl,
-            fewshot_percent=100
-        )
+for pct in feat_pct:
+    # Load in selected features based on the spearman correlation analysis
+    sel_features_df0 = pd.read_excel("datasets/carbon/res_daily/ranked_abs_features_daily.xlsx")
+    sel_feature_len = int(pct * len(sel_features_df0))
+    sel_features_df0.sort_values(by="Correlation", ascending=False, inplace=True)
+    sel_feature_names = sel_features_df0["Factor"][0:sel_feature_len].tolist()
+    sel_feature_names = [val for val in sel_feature_names if 'Historical Price' not in val]
 
-        # finetune_eval(
-        #     dataset_name=target_dataset,
-        #     batch_size=BSZ,
-        #     gradient_accumulation_steps = grad_acc,
-        #     prediction_filter_length=pl,
-        #     fewshot_percent=5
-        # )
-    except Exception as e:
-        print(e.with_traceback())
-        err_log.append(e)
+    for pl in pred_lens:
+        print(f'Running {pct}-feats and pl-{pl}...')
 
-    torch.cuda.empty_cache()
+        try:
+            if pct == 0:
+                zeroshot_eval(
+                    dataset_name=target_dataset,
+                    batch_size=BSZ * grad_acc,
+                    prediction_filter_length=pl,
+                )
+
+            finetune_eval(
+                dataset_name=target_dataset,
+                batch_size=BSZ,
+                # forecast_length=pl, # this is for data formatting purposes - check if including this would result in better performance?
+                prediction_filter_length=pl, # this will help us return our data in the correct format
+                gradient_accumulation_steps=grad_acc,
+                fewshot_percent=100,
+                conditional_columns=sel_feature_names,
+            )
+        except Exception as e:
+            # print(e.with_traceback())
+            err_log.append(e)
+
+        torch.cuda.empty_cache()
 
 print(err_log)

@@ -27,6 +27,23 @@ for pct in feat_pct:
 
     output.append(pd.DataFrame(ft_map))
 
+# one more round for zeroshot 0 feats
+feat_pct.append(0)
+pred_lens = [1] + [i for i in range(2, 19, 2)]
+context_length = [i for i in range(2, 21, 2)]
+ft_map = {}
+for ctx in context_length:
+    ft_map[f'ctx_{ctx}'] = {}
+    for pl in pred_lens:
+        print(f'Running zeroshot 0-feats, CTX-{ctx} and pl-{pl}...')
+        df = pd.read_csv(f'results/carbon/TTMs_feat0_ctx{ctx}_pl{pl}_zeroshot.csv')
+
+        mape = np.mean(np.abs((df['Price'] - df['true']) / df['true'])) * 100
+
+        ft_map[f'ctx_{ctx}'][f'pl_{pl}'] = mape
+
+output.append(pd.DataFrame(ft_map))
+
 for idx, mape_df in enumerate(output):
     mape_df.index = mape_df.index.str.replace('pl_', '')
     mape_df.columns = mape_df.columns.str.replace('ctx_', '')
@@ -53,7 +70,7 @@ for idx, mape_df in enumerate(output):
         # Customize plot
         ax = axes[i]
         ax.plot(row, 'b-', marker='o', markersize=4)
-        ax.set_title(f'PL-{index}', fontsize=10)
+        ax.set_title(f'PL-{index}', fontsize=14)
         ax.set_xticks(row.index)
         ax.set_xlabel('Context Length')
         ax.set_ylabel('MAPE (%)')
@@ -65,3 +82,5 @@ for idx, mape_df in enumerate(output):
 
     plt.tight_layout(rect=(0, 0.03, 1, 0.95))
     fig.savefig(output_dir / f'subplots_feat{feat_pct[idx]}.png', bbox_inches='tight')
+
+    mape_df.to_csv(output_dir / f'mape_results_feat{feat_pct[idx]}.csv')

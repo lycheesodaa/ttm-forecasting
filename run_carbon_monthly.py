@@ -1,7 +1,9 @@
 import math
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
+from utils import log_into_csv
+
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 import torch
 import yaml
 import glob
@@ -57,6 +59,7 @@ def zeroshot_eval(dataset_name, batch_size, context_length=512, forecast_length=
         forecast_length=forecast_length,
         fewshot_fraction=1.0,
         dataset_root_path=DATA_ROOT_PATH,
+        use_padding=True
     )
 
     # model_cfg = TinyTimeMixerConfig(
@@ -124,6 +127,11 @@ def zeroshot_eval(dataset_name, batch_size, context_length=512, forecast_length=
 
     # dset_test should be the same size as reshaped
     to_export.to_csv(output_dir + f'TTMs_feat{len(conditional_columns)}_ctx{context_length}_pl{prediction_filter_length}_zeroshot.csv')
+
+    log_into_csv(to_export, dataset_name, 'zeroshot',
+                 seq_len=context_length, pred_len=forecast_length,
+                 pred_filter_len=prediction_filter_length, bsz=batch_size,
+                 log_file_name = 'carbon_monthly', pred_col_name='Price')
 
     # plot
     # plot_predictions(
@@ -299,6 +307,11 @@ def finetune_eval(
     else:
         to_export.to_csv(output_dir + f'TTMs_feat{len(conditional_columns)}_ctx{context_length}_pl{prediction_filter_length}_fewshot{fewshot_percent}.csv')
 
+    log_into_csv(to_export, dataset_name, 'fullshot',
+                 ch_mix=True, seq_len=context_length, pred_len=forecast_length,
+                 pred_filter_len=prediction_filter_length, lr=learning_rate, bsz=batch_size,
+                 log_file_name = 'carbon_monthly', pred_col_name='Price')
+
     # plot
     # plot_predictions(
     #     model=finetune_forecast_trainer.model,
@@ -309,13 +322,13 @@ def finetune_eval(
     # )
 
 err_log = []
-pred_lens = [i for i in range (2,19)]
-context_length = [i for i in range(15,7,-1)]
-feat_pct = [0.1, 0.2, 0.3]
+pred_lens = [1] + [i for i in range(2, 19, 2)]
+context_length = [i for i in range(2, 21, 2)]
+feat_pct = [0.2]
 
 for pct in feat_pct:
     # Load in selected features based on the spearman correlation analysis
-    sel_features_df0 = pd.read_excel("datasets/carbon/res/ranked_features_monthly.xlsx")
+    sel_features_df0 = pd.read_excel("datasets/carbon/res/ranked_abs_features_monthly.xlsx")
     sel_feature_len = int(pct * len(sel_features_df0))
     sel_features_df0.sort_values(by="Correlation", ascending=False)
     sel_feature_names = sel_features_df0["Factor"][0:sel_feature_len].tolist()
@@ -348,8 +361,7 @@ for pct in feat_pct:
                     conditional_columns=sel_feature_names,
                 )
             except Exception as e:
-                print(e.__traceback__)
-                err_log.append(e)
+                print(e.with_traceback())
 
             torch.cuda.empty_cache()
 
