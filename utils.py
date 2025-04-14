@@ -59,10 +59,31 @@ def calculate_mape(y_true: list, y_pred: list) -> float:
     return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
 
 
+def create_revision_name(context_length, forecast_length, return_lengths=False):
+    # TTM model branch config options
+    # Check tree branches here https://huggingface.co/ibm-granite/granite-timeseries-ttm-r2/tree/main for possible configs
+    CTX_OPTIONS = [512, 1024, 1536]
+    PDT_OPTIONS = [96, 192, 336, 720]
+
+    lowest_context_length = min([x for x in CTX_OPTIONS if x >= context_length])
+    lowest_forecast_length = min([x for x in PDT_OPTIONS if x >= forecast_length])
+
+    if lowest_context_length == 512 and lowest_forecast_length == 96:
+        revision = 'main'
+    else:
+        revision = f'{lowest_context_length}-{lowest_forecast_length}-r2'
+
+    if return_lengths:
+        return revision, lowest_context_length, lowest_forecast_length
+    else:
+        return revision
+
+
 def log_into_csv(
     results_df: pd.DataFrame,
     name: str,
     stage: str,
+    model: str = 'TTM',
     ch_mix: bool = None,
     seq_len: int = 512,
     pred_len: int = 96,
@@ -96,7 +117,7 @@ def log_into_csv(
         'timestamp': datetime.datetime.now(),
         'name': name,
         'stage': stage,
-        'model': 'TTM',
+        'model': model,
         'ch_mix': ch_mix,
         'seq_len': seq_len,
         'pred_len': pred_len,

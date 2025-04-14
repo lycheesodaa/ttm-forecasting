@@ -1,0 +1,29 @@
+data_file: demand_full_weekly.csv
+data_path: demand/
+id_columns: []
+timestamp_column: datetime
+target_columns: [system_demand_actual]
+observable_columns: []
+control_columns: []
+conditional_columns: []
+static_categorical_columns: []
+freq: W
+
+scale: 
+    scaling: True
+    scaler_type: standard
+
+encode_categorical: False
+
+split:
+    train:
+        - 0
+        - 2
+    valid:
+        - 2
+        - 4
+    test:
+        - 4
+        - 516
+
+

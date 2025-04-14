@@ -137,6 +137,7 @@ notebooks/thinklab/checkpoint/**
 
 # Checkpoints
 *.checkpoint-*/
+ttm_finetuned_models/
 
 # Version
 /tsfm_public/_version.py
@@ -146,3 +147,7 @@ datasets/
 
 # Model results
 results/
+figures/
+
+.idea/
+.vscode/

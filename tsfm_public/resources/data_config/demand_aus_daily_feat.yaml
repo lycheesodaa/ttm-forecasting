@@ -5,10 +5,9 @@ timestamp_column: datetime
 target_columns: [actual]
 observable_columns: []
 control_columns: []
-conditional_columns: [price, year, month, day, day_of_week, is_weekend,
-                      humidity, tempC, heatIndexC, precipMM, windspeedKmph, winddirDegree, windGustKmph,
-                      weatherDesc, visibility, pressure, cloudcover, dewPointC, uvIndex, feelsLikeC,
-                      civic_aqi, florey_aqi, monash_aqi, aggregate_aqi]
+conditional_columns: [price, month, is_weekend,
+                      tempC, heatIndexC, dewPointC, uvIndex,
+                      monash_aqi, aggregate_aqi]
 static_categorical_columns: []
 freq: D
 

@@ -23,6 +23,7 @@ from transformers.feature_extraction_utils import (
     PreTrainedFeatureExtractor,
 )
 
+from utils import create_revision_name
 from .dataset import ForecastDFDataset
 from .util import (
     FractionLocation,
@@ -904,8 +905,11 @@ def get_datasets(
 
     # New code - padding-related for shorter than TTM requirements
     if use_padding:
-        params["pad_past_length"] = 512
-        params["pad_future_length"] = 96
+        model_revision, ctx, pdt = create_revision_name(
+            ts_preprocessor.context_length, ts_preprocessor.prediction_length, return_lengths=True)
+
+        params["pad_past_length"] = ctx
+        params["pad_future_length"] = pdt
 
     return tuple([ForecastDFDataset(d, **params) for d in train_valid_test_prep])
 

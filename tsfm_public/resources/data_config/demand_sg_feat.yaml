@@ -2,14 +2,12 @@ data_file: demand_data_all_cleaned_numerical.csv
 data_path: demand/
 id_columns: []
 timestamp_column: datetime
-#target_columns: []
 target_columns: [actual]
 observable_columns: []
 control_columns: []
-conditional_columns: [met,price,year,month,day,hour,period,day_of_week,is_weekend,
-                      humidity,tempC,heatIndexC,precipMM,windspeedKmph,winddirDegree,windGustKmph,
-                      weatherDesc,visibility,pressure,cloudcover,dewPointC,uvIndex,feelsLikeC,
-                      north,south,east,west,central,aggregatePSI]
+conditional_columns: [met,
+                      hour, period,
+                      tempC, heatIndexC, feelsLikeC, humidity]
 static_categorical_columns: []
 freq: 1h
 

@@ -83,9 +83,6 @@ def load_dataset(
         parse_dates=[config["timestamp_column"]],
     )
 
-    # if len(data) <= 512 + 96:
-    #     raise IndexError('Data is shorter than the required horizon.')
-
     train_dataset, valid_dataset, test_dataset = get_datasets(
         tsp,
         data,
