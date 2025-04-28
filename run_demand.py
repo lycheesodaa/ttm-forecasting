@@ -6,10 +6,6 @@ from utils import log_into_csv, create_revision_name
 
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 import torch
-import yaml
-import glob
-import logging
-from importlib import resources
 from pathlib import Path
 
 import tempfile
@@ -21,7 +17,7 @@ from transformers import EarlyStoppingCallback, Trainer, TrainingArguments, set_
 
 from tsfm_public import TinyTimeMixerForPrediction, TrackingCallback, count_parameters, load_dataset, \
     TinyTimeMixerConfig, TimeSeriesForecastingPipeline
-from tsfm_public.toolkit.visualization import plot_predictions
+# from tsfm_public.toolkit.visualization import plot_predictions
 
 # Set seed for reproducibility
 SEED = 1234
@@ -51,8 +47,8 @@ Path(output_dir).mkdir(parents=True, exist_ok=True)
 OUT_DIR = "ttm_finetuned_models/"
 
 # global param setting
-BSZ = 1
-grad_acc = 16
+BSZ = 16
+grad_acc = 1
 
 def zeroshot_eval(dataset_name, batch_size, context_length=512, forecast_length=96):
     # Get data
@@ -205,7 +201,7 @@ def finetune_eval(
         num_train_epochs=num_epochs,
         gradient_accumulation_steps=gradient_accumulation_steps,
         do_eval=True,
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
         dataloader_num_workers=1,
